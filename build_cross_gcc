@@ -8,6 +8,8 @@ trap 'echo FAILED COMMAND: $previous_command' EXIT
 # Customize the variables (INSTALL_PATH, TARGET, etc.) to your liking before running.
 # If you get an error and need to resume the script from some point in the middle,
 # just delete/comment the preceding lines before running it again.
+#
+# See: http://preshing.com/20141119/how-to-build-a-gcc-cross-compiler
 #-------------------------------------------------------------------------------------------
 
 INSTALL_PATH=/opt/cross
