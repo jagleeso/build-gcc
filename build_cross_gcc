@@ -119,7 +119,6 @@ fi
 
 # Step 7. Standard C++ Library & the rest of GCC
 cd build-gcc
-echo pm=$PARALLEL_MAKE
 make $PARALLEL_MAKE all
 make install
 cd ..
