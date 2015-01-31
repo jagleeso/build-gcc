@@ -32,7 +32,7 @@ export PATH=$INSTALL_PATH/bin:$PATH
 # Download packages
 export http_proxy=$HTTP_PROXY https_proxy=$HTTP_PROXY ftp_proxy=$HTTP_PROXY
 wget -nc https://ftp.gnu.org/gnu/binutils/$BINUTILS_VERSION.tar.gz
-wget -nc https://ftp.gnu.org/gnu/gcc/gcc-4.9.2/$GCC_VERSION.tar.gz
+wget -nc https://ftp.gnu.org/gnu/gcc/$GCC_VERSION/$GCC_VERSION.tar.gz
 if [ $USE_NEWLIB -ne 0 ]; then
     wget -nc -O newlib-master.zip https://github.com/bminor/newlib/archive/master.zip || true
     unzip -qo newlib-master.zip
@@ -50,7 +50,7 @@ wget -nc ftp://gcc.gnu.org/pub/gcc/infrastructure/$CLOOG_VERSION.tar.gz
 for f in *.tar*; do tar xfk $f; done
 
 # Make symbolic links
-cd gcc-4.9.2
+cd $GCC_VERSION
 ln -sf `ls -1d ../mpfr-*/` mpfr
 ln -sf `ls -1d ../gmp-*/` gmp
 ln -sf `ls -1d ../mpc-*/` mpc
@@ -61,14 +61,14 @@ cd ..
 # Step 1. Binutils
 mkdir -p build-binutils
 cd build-binutils
-../binutils-2.24/configure --prefix=$INSTALL_PATH --target=$TARGET $CONFIGURATION_OPTIONS
+../$BINUTILS_VERSION/configure --prefix=$INSTALL_PATH --target=$TARGET $CONFIGURATION_OPTIONS
 make $PARALLEL_MAKE
 make install
 cd ..
 
 # Step 2. Linux Kernel Headers
 if [ $USE_NEWLIB -eq 0 ]; then
-    cd linux-3.17.2
+    cd $LINUX_KERNEL_VERSION
     make ARCH=$LINUX_ARCH INSTALL_HDR_PATH=$INSTALL_PATH/$TARGET headers_install
     cd ..
 fi
@@ -79,7 +79,7 @@ cd build-gcc
 if [ $USE_NEWLIB -ne 0 ]; then
     NEWLIB_OPTION=--with-newlib
 fi
-../gcc-4.9.2/configure --prefix=$INSTALL_PATH --target=$TARGET --enable-languages=c,c++ $CONFIGURATION_OPTIONS $NEWLIB_OPTION
+../$GCC_VERSION/configure --prefix=$INSTALL_PATH --target=$TARGET --enable-languages=c,c++ $CONFIGURATION_OPTIONS $NEWLIB_OPTION
 make $PARALLEL_MAKE all-gcc
 make install-gcc
 cd ..
@@ -96,7 +96,7 @@ else
     # Step 4. Standard C Library Headers and Startup Files
     mkdir -p build-glibc
     cd build-glibc
-    ../glibc-2.20/configure --prefix=$INSTALL_PATH/$TARGET --build=$MACHTYPE --host=$TARGET --target=$TARGET --with-headers=$INSTALL_PATH/$TARGET/include $CONFIGURATION_OPTIONS libc_cv_forced_unwind=yes
+    ../$GLIBC_VERSION/configure --prefix=$INSTALL_PATH/$TARGET --build=$MACHTYPE --host=$TARGET --target=$TARGET --with-headers=$INSTALL_PATH/$TARGET/include $CONFIGURATION_OPTIONS libc_cv_forced_unwind=yes
     make install-bootstrap-headers=yes install-headers
     make $PARALLEL_MAKE csu/subdir_lib
     install csu/crt1.o csu/crti.o csu/crtn.o $INSTALL_PATH/$TARGET/lib
