@@ -17,7 +17,8 @@ TARGET=aarch64-linux
 USE_NEWLIB=0
 LINUX_ARCH=arm64
 CONFIGURATION_OPTIONS="--disable-multilib" # --disable-threads --disable-shared
-PARALLEL_MAKE=-j4
+NUM_CPUS=$(grep -c ^processor /proc/cpuinfo)
+PARALLEL_MAKE=-j$NUM_CPUS
 BINUTILS_VERSION=binutils-2.24
 GCC_REPO=gcc
 GCC_BRANCH=noop
@@ -35,27 +36,45 @@ mkdir -p $INSTALL_PATH
 
 # Download packages
 export http_proxy=$HTTP_PROXY https_proxy=$HTTP_PROXY ftp_proxy=$HTTP_PROXY
-wget -nc https://ftp.gnu.org/gnu/binutils/$BINUTILS_VERSION.tar.gz
-git clone $GCC_URL
-(
-    cd $GCC_REPO
-    git checkout $GCC_BRANCH
-)
+download_if_not_exists() {
+    local url="$1"
+    shift 1
+    if [ ! -e "$(basename "$url")" ]; then
+        wget -nc "$@" "$url"
+    fi
+}
+extract() {
+    local tarfile="$1"
+    local extracted="$(echo "$tarfile" | sed 's/\.tar.*$//')"
+    if [ ! -d  "$extracted" ]; then
+        tar xfk $tarfile
+    fi
+}
+download_if_not_exists https://ftp.gnu.org/gnu/binutils/$BINUTILS_VERSION.tar.gz
+if [ ! -d $GCC_REPO ]; then
+    git clone $GCC_URL
+    (
+        cd $GCC_REPO
+        git checkout $GCC_BRANCH
+    )
+fi
 if [ $USE_NEWLIB -ne 0 ]; then
-    wget -nc -O newlib-master.zip https://github.com/bminor/newlib/archive/master.zip || true
+    download_if_not_exists newlib-master.zip https://github.com/bminor/newlib/archive/master.zip -O || true
     unzip -qo newlib-master.zip
 else
-    wget -nc https://www.kernel.org/pub/linux/kernel/v3.x/$LINUX_KERNEL_VERSION.tar.xz
-    wget -nc https://ftp.gnu.org/gnu/glibc/$GLIBC_VERSION.tar.xz
+    download_if_not_exists https://www.kernel.org/pub/linux/kernel/v3.x/$LINUX_KERNEL_VERSION.tar.xz
+    download_if_not_exists https://ftp.gnu.org/gnu/glibc/$GLIBC_VERSION.tar.xz
 fi
-wget -nc https://ftp.gnu.org/gnu/mpfr/$MPFR_VERSION.tar.xz
-wget -nc https://ftp.gnu.org/gnu/gmp/$GMP_VERSION.tar.xz
-wget -nc https://ftp.gnu.org/gnu/mpc/$MPC_VERSION.tar.gz
-wget -nc ftp://gcc.gnu.org/pub/gcc/infrastructure/$ISL_VERSION.tar.bz2
-wget -nc ftp://gcc.gnu.org/pub/gcc/infrastructure/$CLOOG_VERSION.tar.gz
+download_if_not_exists https://ftp.gnu.org/gnu/mpfr/$MPFR_VERSION.tar.xz
+download_if_not_exists https://ftp.gnu.org/gnu/gmp/$GMP_VERSION.tar.xz
+download_if_not_exists https://ftp.gnu.org/gnu/mpc/$MPC_VERSION.tar.gz
+download_if_not_exists ftp://gcc.gnu.org/pub/gcc/infrastructure/$ISL_VERSION.tar.bz2
+download_if_not_exists ftp://gcc.gnu.org/pub/gcc/infrastructure/$CLOOG_VERSION.tar.gz
 
 # Extract everything
-for f in *.tar*; do tar xfk $f; done
+for f in *.tar*; do 
+    extract $f
+done
 
 # Make symbolic links
 cd $GCC_REPO
@@ -87,7 +106,7 @@ cd build-gcc
 if [ $USE_NEWLIB -ne 0 ]; then
     NEWLIB_OPTION=--with-newlib
 fi
-../$GCC_VERSION/configure --prefix=$INSTALL_PATH --target=$TARGET --enable-languages=c,c++ $CONFIGURATION_OPTIONS $NEWLIB_OPTION
+../$GCC_REPO/configure --prefix=$INSTALL_PATH --target=$TARGET --enable-languages=c,c++ $CONFIGURATION_OPTIONS $NEWLIB_OPTION
 make $PARALLEL_MAKE all-gcc
 make install-gcc
 cd ..
