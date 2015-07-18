@@ -12,14 +12,16 @@ trap 'echo FAILED COMMAND: $previous_command' EXIT
 # See: http://preshing.com/20141119/how-to-build-a-gcc-cross-compiler
 #-------------------------------------------------------------------------------------------
 
-INSTALL_PATH=/opt/cross
+INSTALL_PATH=$HOME/opt/cross
 TARGET=aarch64-linux
 USE_NEWLIB=0
 LINUX_ARCH=arm64
 CONFIGURATION_OPTIONS="--disable-multilib" # --disable-threads --disable-shared
 PARALLEL_MAKE=-j4
 BINUTILS_VERSION=binutils-2.24
-GCC_VERSION=gcc-4.9.2
+GCC_REPO=gcc
+GCC_BRANCH=noop
+GCC_URL=https://github.com/jagleeso/$GCC_REPO.git
 LINUX_KERNEL_VERSION=linux-3.17.2
 GLIBC_VERSION=glibc-2.20
 MPFR_VERSION=mpfr-3.1.2
@@ -29,10 +31,16 @@ ISL_VERSION=isl-0.12.2
 CLOOG_VERSION=cloog-0.18.1
 export PATH=$INSTALL_PATH/bin:$PATH
 
+mkdir -p $INSTALL_PATH
+
 # Download packages
 export http_proxy=$HTTP_PROXY https_proxy=$HTTP_PROXY ftp_proxy=$HTTP_PROXY
 wget -nc https://ftp.gnu.org/gnu/binutils/$BINUTILS_VERSION.tar.gz
-wget -nc https://ftp.gnu.org/gnu/gcc/$GCC_VERSION/$GCC_VERSION.tar.gz
+git clone $GCC_URL
+(
+    cd $GCC_REPO
+    git checkout $GCC_BRANCH
+)
 if [ $USE_NEWLIB -ne 0 ]; then
     wget -nc -O newlib-master.zip https://github.com/bminor/newlib/archive/master.zip || true
     unzip -qo newlib-master.zip
@@ -50,7 +58,7 @@ wget -nc ftp://gcc.gnu.org/pub/gcc/infrastructure/$CLOOG_VERSION.tar.gz
 for f in *.tar*; do tar xfk $f; done
 
 # Make symbolic links
-cd $GCC_VERSION
+cd $GCC_REPO
 ln -sf `ls -1d ../mpfr-*/` mpfr
 ln -sf `ls -1d ../gmp-*/` gmp
 ln -sf `ls -1d ../mpc-*/` mpc
