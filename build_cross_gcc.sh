@@ -13,6 +13,14 @@ trap 'echo FAILED COMMAND: $previous_command' EXIT
 #-------------------------------------------------------------------------------------------
 
 INSTALL_PATH=$HOME/opt/cross
+GCC_BRANCH=num-args
+
+# INSTALL_PATH=$HOME/opt/cross/wenbo
+# GCC_BRANCH=wenbo
+
+# INSTALL_PATH=$HOME/opt/cross/nohyperdrive
+# GCC_BRANCH=a7aa383874520cd5762701f1c790c930c5ab5bb5
+
 TARGET=aarch64-linux
 USE_NEWLIB=0
 LINUX_ARCH=arm64
@@ -21,7 +29,6 @@ NUM_CPUS=$(grep -c ^processor /proc/cpuinfo)
 PARALLEL_MAKE=-j$NUM_CPUS
 BINUTILS_VERSION=binutils-2.24
 GCC_REPO=gcc
-GCC_BRANCH=noop
 GCC_URL=https://github.com/jagleeso/$GCC_REPO.git
 LINUX_KERNEL_VERSION=linux-3.17.2
 GLIBC_VERSION=glibc-2.20
@@ -31,6 +38,14 @@ MPC_VERSION=mpc-1.0.2
 ISL_VERSION=isl-0.12.2
 CLOOG_VERSION=cloog-0.18.1
 export PATH=$INSTALL_PATH/bin:$PATH
+
+get_root() {
+    (
+        cd "$(dirname $0)"
+        pwd
+    )
+}
+ROOT=$(get_root)
 
 mkdir -p $INSTALL_PATH
 
@@ -53,11 +68,11 @@ extract() {
 download_if_not_exists https://ftp.gnu.org/gnu/binutils/$BINUTILS_VERSION.tar.gz
 if [ ! -d $GCC_REPO ]; then
     git clone $GCC_URL
-    (
-        cd $GCC_REPO
-        git checkout $GCC_BRANCH
-    )
 fi
+(
+    cd $GCC_REPO
+    git checkout $GCC_BRANCH
+)
 if [ $USE_NEWLIB -ne 0 ]; then
     download_if_not_exists newlib-master.zip https://github.com/bminor/newlib/archive/master.zip -O || true
     unzip -qo newlib-master.zip
@@ -86,6 +101,15 @@ ln -sf `ls -1d ../cloog-*/` cloog
 cd ..
 
 # Step 1. Binutils
+# (
+#     # Patch binutils
+#     # https://sourceware.org/ml/binutils/2014-10/msg00162.html
+#     #
+#     # Ran into this bug once I added 2 nops to ENTRY definition in linux kernel.
+#     cd $BINUTILS_VERSION
+#     patch -N -p1 < $ROOT/binutils-master-aarch64-error-handling.patch || true
+# )
+
 mkdir -p build-binutils
 cd build-binutils
 ../$BINUTILS_VERSION/configure --prefix=$INSTALL_PATH --target=$TARGET $CONFIGURATION_OPTIONS
@@ -110,6 +134,15 @@ fi
 make $PARALLEL_MAKE all-gcc
 make install-gcc
 cd ..
+
+# For some reason, GCC build system does not bother to install gmp.h in $INSTALL_PATH/include.
+# (mind you, it does build the library).
+# So, lets manually do it.
+# (Needed for building GCC plugins)
+(
+    cd build-gcc/gmp
+    make install
+)
 
 if [ $USE_NEWLIB -ne 0 ]; then
     # Steps 4-6: Newlib
