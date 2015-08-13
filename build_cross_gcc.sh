@@ -146,6 +146,15 @@ make $PARALLEL_MAKE all-gcc
 make install-gcc
 cd ..
 
+# For some reason, GCC build system does not bother to install gmp.h in $INSTALL_PATH/include.
+# (mind you, it does build the library).
+# So, lets manually do it.
+# (Needed for building GCC plugins)
+(
+    cd build-gcc/gmp
+    make install
+)
+
 if [ $USE_NEWLIB -ne 0 ]; then
     # Steps 4-6: Newlib
     mkdir -p build-newlib
