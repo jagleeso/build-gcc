@@ -37,6 +37,7 @@ GMP_VERSION=gmp-6.0.0a
 MPC_VERSION=mpc-1.0.2
 ISL_VERSION=isl-0.12.2
 CLOOG_VERSION=cloog-0.18.1
+GDB_VERSION=gdb-7.9
 export PATH=$INSTALL_PATH/bin:$PATH
 
 get_root() {
@@ -49,7 +50,7 @@ ROOT=$(get_root)
 
 mkdir -p $INSTALL_PATH
 
-# Download packages
+# # Download packages
 export http_proxy=$HTTP_PROXY https_proxy=$HTTP_PROXY ftp_proxy=$HTTP_PROXY
 download_if_not_exists() {
     local url="$1"
@@ -65,6 +66,11 @@ extract() {
         tar xfk $tarfile
     fi
 }
+
+
+#
+# Download everything.
+#
 download_if_not_exists https://ftp.gnu.org/gnu/binutils/$BINUTILS_VERSION.tar.gz
 if [ ! -d $GCC_REPO ]; then
     git clone $GCC_URL
@@ -85,12 +91,14 @@ download_if_not_exists https://ftp.gnu.org/gnu/gmp/$GMP_VERSION.tar.xz
 download_if_not_exists https://ftp.gnu.org/gnu/mpc/$MPC_VERSION.tar.gz
 download_if_not_exists ftp://gcc.gnu.org/pub/gcc/infrastructure/$ISL_VERSION.tar.bz2
 download_if_not_exists ftp://gcc.gnu.org/pub/gcc/infrastructure/$CLOOG_VERSION.tar.gz
+download_if_not_exists https://ftp.gnu.org/gnu/gdb/$GDB_VERSION.tar.gz
 
-# Extract everything
+#
+# Extract everything.
+#
 for f in *.tar*; do 
     extract $f
 done
-
 # Make symbolic links
 cd $GCC_REPO
 ln -sf `ls -1d ../mpfr-*/` mpfr
@@ -100,15 +108,9 @@ ln -sf `ls -1d ../isl-*/` isl
 ln -sf `ls -1d ../cloog-*/` cloog
 cd ..
 
-# Step 1. Binutils
-# (
-#     # Patch binutils
-#     # https://sourceware.org/ml/binutils/2014-10/msg00162.html
-#     #
-#     # Ran into this bug once I added 2 nops to ENTRY definition in linux kernel.
-#     cd $BINUTILS_VERSION
-#     patch -N -p1 < $ROOT/binutils-master-aarch64-error-handling.patch || true
-# )
+#
+# Start building everything.
+#
 
 mkdir -p build-binutils
 cd build-binutils
@@ -130,19 +132,19 @@ cd build-gcc
 if [ $USE_NEWLIB -ne 0 ]; then
     NEWLIB_OPTION=--with-newlib
 fi
-../$GCC_REPO/configure --prefix=$INSTALL_PATH --target=$TARGET --enable-languages=c,c++ $CONFIGURATION_OPTIONS $NEWLIB_OPTION
+# Options needed for GCC plugin support.
+#
+# GCC_PLUGIN_ARGS=--with-gmp-include=$(pwd)/gmp --with-gmp-lib=$(pwd)/gmp/.libs
+#
+# NOTE:
+# For whatever reason, if you use --enable-languages=c,c++, plugin headers (needed to 
+# build plugins) won't get installed to lib/gcc/aarch64-linux/4.9.0/plugin/include.
+GCC_PLUGIN_ARGS="--enable-plugin --enable-languages=c"
+../$GCC_REPO/configure --prefix=$INSTALL_PATH --target=$TARGET $CONFIGURATION_OPTIONS $NEWLIB_OPTION \
+    $GCC_PLUGIN_ARGS
 make $PARALLEL_MAKE all-gcc
 make install-gcc
 cd ..
-
-# For some reason, GCC build system does not bother to install gmp.h in $INSTALL_PATH/include.
-# (mind you, it does build the library).
-# So, lets manually do it.
-# (Needed for building GCC plugins)
-(
-    cd build-gcc/gmp
-    make install
-)
 
 if [ $USE_NEWLIB -ne 0 ]; then
     # Steps 4-6: Newlib
@@ -180,6 +182,15 @@ fi
 # Step 7. Standard C++ Library & the rest of GCC
 cd build-gcc
 make $PARALLEL_MAKE all
+make install
+cd ..
+
+# Step 8. Build GDB
+mkdir -p build-gdb
+cd build-gdb
+# Use --with-python so that python scripts in CONFIG_GDB_SCRIPTS work (for QEMU kernel development).
+../$GDB_VERSION/configure --prefix=$INSTALL_PATH --target=$TARGET $CONFIGURATION_OPTIONS --with-python
+make $PARALLEL_MAKE
 make install
 cd ..
 
