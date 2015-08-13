@@ -134,12 +134,10 @@ if [ $USE_NEWLIB -ne 0 ]; then
 fi
 # Options needed for GCC plugin support.
 #
-# GCC_PLUGIN_ARGS=--with-gmp-include=$(pwd)/gmp --with-gmp-lib=$(pwd)/gmp/.libs
-#
 # NOTE:
 # For whatever reason, if you use --enable-languages=c,c++, plugin headers (needed to 
 # build plugins) won't get installed to lib/gcc/aarch64-linux/4.9.0/plugin/include.
-GCC_PLUGIN_ARGS="--enable-plugin --enable-languages=c"
+GCC_PLUGIN_ARGS="--with-gmp-include=$(pwd)/gmp --with-gmp-lib=$(pwd)/gmp/.libs --enable-plugin --enable-languages=c"
 ../$GCC_REPO/configure --prefix=$INSTALL_PATH --target=$TARGET $CONFIGURATION_OPTIONS $NEWLIB_OPTION \
     $GCC_PLUGIN_ARGS
 make $PARALLEL_MAKE all-gcc
