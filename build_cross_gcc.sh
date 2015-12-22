@@ -14,12 +14,19 @@ trap 'echo FAILED COMMAND: $previous_command' EXIT
 
 INSTALL_PATH=$HOME/opt/cross
 GCC_BRANCH=num-args
+GCC_PROGRAM_PREFIX=
+
+INSTALL_PATH=$HOME/opt/cross/investigate-slowness
+GCC_BRANCH=investigate-slowness
+GCC_PROGRAM_PREFIX=investigate-slowness-
+
+# INSTALL_PATH=$HOME/opt/cross/nohyperdrive
+# # Commit I originally based changes off of.
+# GCC_BRANCH=a7aa383874520cd5762701f1c790c930c5ab5bb5
+# GCC_PROGRAM_PREFIX=nohyperdrive-
 
 # INSTALL_PATH=$HOME/opt/cross/wenbo
 # GCC_BRANCH=wenbo
-
-# INSTALL_PATH=$HOME/opt/cross/nohyperdrive
-# GCC_BRANCH=a7aa383874520cd5762701f1c790c930c5ab5bb5
 
 TARGET=aarch64-linux
 USE_NEWLIB=0
@@ -61,8 +68,16 @@ download_if_not_exists() {
 }
 extract() {
     local tarfile="$1"
-    local extracted="$(echo "$tarfile" | sed 's/\.tar.*$//')"
-    if [ ! -d  "$extracted" ]; then
+    # local extracted="$(echo "$tarfile" | sed 's/\.tar.*$//')"
+
+    # tar files usually have 1 directory in them.
+    tar_folder() {
+        tar --list --file binutils-2.24.tar.gz \
+            | ruby -lane 'if m = $_.match(/^([^\/]+)\//); then puts m.captures[0]; end' \
+            | sort --unique
+    }
+    local tar_dir="$(tar_folder $tarfile)"
+    if [ ! -d  "$tar_dir" ]; then
         tar xfk $tarfile
     fi
 }
@@ -138,8 +153,13 @@ fi
 # For whatever reason, if you use --enable-languages=c,c++, plugin headers (needed to 
 # build plugins) won't get installed to lib/gcc/aarch64-linux/4.9.0/plugin/include.
 GCC_PLUGIN_ARGS="--with-gmp-include=$(pwd)/gmp --with-gmp-lib=$(pwd)/gmp/.libs --enable-plugin --enable-languages=c"
+GCC_PREFIX_ARGS=
+if [ ! -z "$GCC_PROGRAM_PREFIX" ]; then
+    GCC_PREFIX_ARGS=" --program-prefix=$GCC_PROGRAM_PREFIX"
+fi
 ../$GCC_REPO/configure --prefix=$INSTALL_PATH --target=$TARGET $CONFIGURATION_OPTIONS $NEWLIB_OPTION \
-    $GCC_PLUGIN_ARGS
+    $GCC_PLUGIN_ARGS \
+    $GCC_PREFIX_ARGS
 make $PARALLEL_MAKE all-gcc
 make install-gcc
 cd ..
